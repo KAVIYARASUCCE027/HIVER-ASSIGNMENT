@@ -1,0 +1,18 @@
+# Exact configuration used for the Phase G zero-shot LLM classifier evaluation.
+# Regenerated each run by evaluation/run_llm_classifier.py -- reflects the
+# configuration of the LAST run, not necessarily the frozen headline run.
+# The frozen headline run's evaluation_date is recorded in reports/llm_classifier_results.md.
+
+provider: gemini
+model: gemini-3.5-flash-lite
+temperature: 0.0
+max_output_tokens: 300
+prompt_version: "phase_g_v1_frozen"
+taxonomy_version: "phase_e_frozen_14_intents"  # config/intents.yaml, unchanged since Phase E approval
+context_window_policy: "full preceding conversation array included verbatim (no truncation observed necessary at golden-set scale)"
+output_schema:
+  intent: "one of the 14 frozen intent names"
+  confidence: "float 0.0-1.0, self-reported, NOT calibrated"
+  alternative_intent: "one of the 14 names, or null"
+  reason: "concise evidence-based explanation, 1-2 sentences"
+evaluation_date: "2026-09-11"

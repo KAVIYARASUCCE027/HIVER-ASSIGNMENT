@@ -1,0 +1,93 @@
+# Phase I.1 candidate-policy experiment configuration.
+#
+# This file does NOT modify config/escalation.yaml or src/escalation/policy.py
+# (both remain the frozen Phase I baseline). It documents the parameters used
+# by evaluation/run_escalation_candidates.py to build and compare alternative
+# policies against that frozen baseline.
+#
+# See reports/escalation_policy_improvement.md for full methodology, the
+# false-escalate/false-auto-handle analysis that motivated each change, and
+# every rejected candidate with its reasoning.
+
+baseline_reference:
+  accuracy: 0.725
+  escalate_precision: 0.420
+  escalate_recall: 0.659
+  escalate_f1: 0.513
+  false_auto_handle: 15
+  false_escalate: 40
+  source: "evaluation/results/escalation_results.json (frozen, untouched)"
+
+# ---------------------------------------------------------------------------
+# Signal changes tested
+# ---------------------------------------------------------------------------
+
+confidence_threshold_candidate:
+  # Sweep 0.60-0.90 (Step 5) showed 0.60-0.75 are IDENTICAL on this benchmark
+  # (fn=15, fp=39) and strictly weakly-dominate the frozen 0.80 (fn=15,
+  # fp=40 -- one extra unnecessary escalation from a single boundary
+  # example). 0.75 kept (not 0.60) to stay conservative and close to the
+  # original Phase G confidence-bucket justification (decision log #17).
+  value: 0.75
+  previous_value: 0.80
+
+new_keyword_signals:
+  # Each directly implements a per-intent conditional escalation clause
+  # ALREADY WRITTEN in config/intents.yaml that Phase I's policy did not
+  # encode (flagged as a known gap in reports/escalation_results.md
+  # Section 12 and decision log #16). Each was tested independently for
+  # both catch-rate (false-auto-handle reduction) and false-positive cost
+  # (new false-escalates among human-auto_handle examples) BEFORE being
+  # included -- see reports/escalation_policy_improvement.md Section 3.
+  hardware_damage_language:
+    pattern: '\b(broken|busted|defective|cracked|shattered|delaminat|won.t (turn on|charge|power)|stopped working|physically damaged)\b'
+    implements: "audio_accessory_issues / apple_watch_issues / mac_macos_issues / order_purchase_retail_support 'repeated hardware failure' / 'physical defect' escalation clauses"
+    measured_catch: "2/15 false-auto-handle (golden_0081, golden_0189)"
+    measured_cost: >
+      1 net-new false-escalate (golden_0006, 'won't turn on' after
+      freezing). Also matches golden_0180's text ('defective'), but
+      golden_0180 was already a false-escalate in the baseline for an
+      unrelated reason (generation_could_not_be_grounded), so it adds no
+      incremental cost -- the riskiest of the three new keyword signals,
+      but its true marginal cost is 1 example, not 2.
+  billing_dispute_language:
+    pattern: '\b(charged (me |twice|again)?|duplicate charge|double charged|billing (dispute|issue|problem)|refund|declin(ed|ing)|still charg)\b'
+    implements: "app_store_purchase_issues / media_music_playback_issues 'billing dispute' escalation clauses"
+    measured_catch: "2/15 false-auto-handle (golden_0146, golden_0190)"
+    measured_cost: "0 new false-escalates"
+  data_loss_language:
+    pattern: '\b(deleted|erased|disappeared|missing|lost|wiped out)\W+(\w+\W+){0,4}?(photo|contact|file|data|message|note)s?\b'
+    implements: "photos_storage_icloud_management 'unexpectedly deleted' escalation clause"
+    measured_catch: "1/15 false-auto-handle (golden_0149)"
+    measured_cost: "0 new false-escalates"
+
+rejected_candidates:
+  # Tested, found NOT generalizable, explicitly excluded (Step 7).
+  repeat_attempt_language:
+    pattern: '\b(already (tried|did|attempted|restarted|updated|reset|rebuilt|wiped)|still (not|doesn.t|isn.t|hasn.t|happening|occurring)|persists?|again and again|multiple times|several times|repeatedly|(second|third|another) time|keeps? happening)\b'
+    hypothesis: "customer already tried the standard fix -- the single most common false-auto-handle pattern by manual reading"
+    result: "0/15 false-auto-handle caught (real language too varied for a keyword regex); fires on 3 human-auto_handle examples with zero offsetting benefit -- net negative, rejected"
+  confusable_intents_ambiguity_flag:
+    result: "already tested and rejected in Phase I (decision log #16) -- not re-tested here"
+  top1_intent_match_false_as_low_confidence:
+    result: "already tested and rejected in Phase I (decision log #16) -- not re-tested here"
+  vague_frustration_evidence_exemption:
+    description: "exempt predicted_intent=vague_frustration_needs_clarification from the insufficient_historical_evidence trigger, since its own taxonomy guidance says a clarifying question is always the correct auto-handle action regardless of evidence"
+    result: "reduces false-escalate by 10 but INCREASES false-auto-handle by 1 (golden_0033, 'root user problem' -- a real reference to the known macOS root-user security vulnerability, misclassified into the residual intent bucket). Presented as Candidate D for comparison but NOT recommended, given Priority 1 (minimize false auto-handle) in the brief."
+
+# ---------------------------------------------------------------------------
+# Evidence/similarity threshold sensitivity (Step 5) -- NOT a deployable
+# candidate, see reports/escalation_policy_improvement.md Section 7.
+# ---------------------------------------------------------------------------
+evidence_threshold_sensitivity:
+  note: >
+    Lowering the escalation policy's evidence-sufficiency reading from
+    Phase H's frozen 0.70 to 0.65 reduces false-escalate by 5 with ZERO
+    false-auto-handle cost on this benchmark (fn stays 15). This is a real,
+    well-supported finding -- but NOT implemented as a candidate policy,
+    because Phase H's OWN generation gate (config/rag.yaml, frozen, not
+    modified) also uses 0.70: for the newly-included [0.65, 0.70) band, no
+    reply was ever generated by the frozen Phase H run, so an AUTO_HANDLE
+    decision for these examples would have no actual reply to send. Flagged
+    as a well-supported direction for a future COORDINATED Phase H + Phase I
+    threshold revision, not something Phase I.1 can deploy alone.

@@ -1,0 +1,29 @@
+# Core data handling
+pandas>=2.0
+numpy>=1.26
+polars>=1.0
+scipy>=1.11
+PyYAML>=6.0
+
+# Baselines (Phase F)
+scikit-learn>=1.4
+
+# Embeddings for intent clustering (Phase D) and the frozen intent centroid
+# classifier used for golden-set sampling and TF-IDF pseudo-labeling (Phase E/F)
+sentence-transformers>=3.0
+
+# LLM classifier / RAG / generation / judge (Phase G onward). Provider is
+# selected at runtime via LLM_PROVIDER in .env (src/classification/llm_providers.py);
+# all three SDKs below are real, dispatched code paths, so all three are
+# listed even though a given run only exercises whichever one is configured.
+python-dotenv>=1.0
+google-genai>=1.0
+openai>=1.0
+anthropic>=0.34
+
+# Not used -- no vector database was needed; retrieval uses a flat numpy
+# cosine-similarity index (see src/retrieval/, reports/decision_log.md).
+# chromadb>=0.5
+
+# Testing
+pytest>=8.0

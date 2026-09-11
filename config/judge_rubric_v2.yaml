@@ -1,0 +1,206 @@
+# Phase J.1 CANDIDATE rubric (V2) -- NOT frozen, NOT used for the full
+# 400-reply evaluation yet. config/judge_rubric.yaml (V1) is unmodified and
+# remains the Phase J baseline. See reports/judge_rubric_audit.md for the
+# full per-dimension audit that produced this file and the decision on
+# whether V2 replaces V1.
+#
+# WHAT CHANGED AND WHY (one line per dimension; full reasoning in the
+# audit report):
+#   relevance          -- reinterpreted for refusals: scores whether
+#                         DECLINING was the relevant/correct decision,
+#                         not whether absent text "addresses" the topic.
+#                         UNCHANGED for normal (non-empty) replies.
+#   helpfulness        -- reinterpreted for refusals: a justified refusal
+#                         scores 3 (adequate -- avoided a bad guess, but
+#                         the customer got no direct progress and must
+#                         wait for escalation), NOT 5 (declining is not
+#                         "fully helpful") and NOT 1 (declining is not
+#                         "zero value" when it correctly avoids a
+#                         misleading answer). UNCHANGED for normal replies.
+#   grounding          -- UNCHANGED. Already conceptually correct for
+#                         refusals (no claims made = trivially no
+#                         unsupported claims) and was never part of the
+#                         identified problem.
+#   factual_safety     -- UNCHANGED. Same reasoning as grounding.
+#   resolution_quality -- reinterpreted for refusals: a justified refusal
+#                         scores 3 (a correct, if indirect, step toward
+#                         eventual resolution via escalation), not 1 or 5.
+#                         UNCHANGED for normal replies.
+#   uncertainty_handling -- SHARPENED, not loosened: this is now the
+#                         PRIMARY dimension that must distinguish
+#                         justified from unjustified refusal. A refusal
+#                         that is NOT actually justified (the evidence
+#                         shown, or general product knowledge, could have
+#                         answered the question) must still score 1-2
+#                         here -- refusing does not earn credit by itself.
+#   professionalism    -- reinterpreted for refusals ONLY to fix a
+#                         category error: V1 scored an intentionally
+#                         empty reply as 1 ("unclear, rude, or malformed"),
+#                         which describes bad TEXT, not ABSENT text. An
+#                         empty reply pending escalation is neither rude
+#                         nor malformed -- it is professionally neutral,
+#                         scored 3. It is NOT scored 5: silence is still
+#                         not a polished customer interaction on its own.
+#                         UNCHANGED for normal replies.
+#
+# WHAT DID NOT CHANGE: the 1-5 scale, the aggregation formula (arithmetic
+# mean of all 7), the model/temperature, the output schema, or ANY
+# criterion for non-empty replies. This is a targeted correction to how
+# empty/declined replies are scored, not a rubric rewrite.
+
+dimensions:
+  relevance:
+    question: "Does the reply address the customer's actual stated issue?"
+    scale:
+      5: "Directly and completely addresses the specific issue/question asked."
+      4: "Addresses the core issue with minor gaps (misses a secondary detail)."
+      3: "Addresses the general topic but misses the specific question asked."
+      2: "Only tangentially related; addresses a different aspect of the message."
+      1: "Does not address the customer's issue at all (wrong topic entirely)."
+    refusal_override: >
+      For an empty/declined reply, do NOT apply the scale above literally
+      (there is no text to be "on-topic" or not). Instead score whether
+      DECLINING was itself the relevant, correct response to this specific
+      request given the evidence you were shown: 5 if the request clearly
+      required specific historical/account/policy knowledge that was
+      genuinely unavailable; 3 if declining was defensible but a general
+      product-knowledge answer might also have been possible; 1 if the
+      request was actually a generic, answerable question and declining
+      was not relevant to what the customer needed (an unjustified refusal).
+
+  helpfulness:
+    question: "Does the reply give the customer something actionable?"
+    scale:
+      5: "Concrete, specific next step(s) or a direct resolution the customer can act on immediately."
+      4: "A clear, useful next step, though possibly generic (e.g. a relevant diagnostic question)."
+      3: "Some direction given but vague, or requires the customer to do most of the work."
+      2: "Minimal help; mostly acknowledgment with no clear path forward."
+      1: "No actionable content; pure filler."
+    refusal_override: >
+      For a JUSTIFIED empty/declined reply (evidence genuinely
+      insufficient or mismatched): score 3 -- declining correctly avoided
+      giving the customer a misleading or fabricated answer, which has
+      real value, but the customer received no direct progress and must
+      wait for human escalation, which is a real cost, not full
+      helpfulness. Do NOT score 5 (nothing was actually given to the
+      customer) and do NOT score 1 (avoiding a bad guess is not "zero
+      value" -- see Section 4 of the audit for why 1 was the V1 problem).
+      For an UNJUSTIFIED decline (declining when the evidence shown, or
+      ordinary product knowledge, could have answered the question):
+      score 1-2 -- this is a genuine helpfulness failure and must not be
+      softened.
+
+  grounding:
+    question: >
+      For RAG replies: are specific claims traceable to the retrieved
+      historical evidence? Paraphrase is fine and should NOT be penalized
+      -- do not require lexical copying, and do not reward a reply merely
+      for resembling the historical response word-for-word. For No-RAG
+      replies (no evidence was provided at all): does the reply
+      appropriately stick to general product knowledge / clarifying
+      questions rather than inventing specific unsupported details?
+    scale:
+      5: "Every specific claim (a fix, a policy, an article, a version number) is directly supported by the evidence (RAG), or the reply makes no specific unsupported claims at all (No-RAG)."
+      4: "Grounded/appropriately general, with only a trivial unsupported flourish (e.g. a generic pleasantry)."
+      3: "Mostly grounded/appropriate, but one questionable-yet-plausible unsupported detail."
+      2: "Contains a specific claim not supported by the evidence (RAG), or an invented specific detail (No-RAG), that could mislead the customer."
+      1: "Substantially fabricated, or directly contradicts the provided evidence."
+    refusal_override: "None -- an empty reply trivially scores 5 here (no claims made, nothing to contradict). Unchanged from V1."
+
+  factual_safety:
+    question: >
+      Distinct from grounding: does the reply avoid objectively false or
+      risky fabrication -- invented policies, invented prices, invented
+      deadlines, or claiming an action was taken that wasn't?
+    scale:
+      5: "No fabricated policies, prices, timelines, or claims of action taken."
+      4: "Borderline generic phrasing, very unlikely to mislead, not perfectly precise."
+      3: "One minor unsupported factual assertion, low real-world risk."
+      2: "A specific fabricated policy/price/promise that could mislead the customer."
+      1: "Confidently states false or dangerous information (e.g. claims a refund was processed, invents a safety instruction)."
+    refusal_override: "None -- an empty reply trivially scores 5 here. Unchanged from V1."
+
+  resolution_quality:
+    question: "Does the reply appropriately move the customer toward resolution (without over-promising or stalling)?"
+    scale:
+      5: "Clear resolution, or a well-targeted next diagnostic step that meaningfully progresses the case."
+      4: "Reasonable progress, though it may require one more round-trip."
+      3: "Generic 'we'll look into it' -- not actively unhelpful, but no real progress."
+      2: "Deflects without adding value beyond what the customer already said."
+      1: "Actively stalls, or promises a resolution path the reply's own content can't actually support."
+    refusal_override: >
+      For a JUSTIFIED decline: score 3 -- correctly declining and
+      (implicitly, via the escalation policy) routing to a human is a
+      legitimate, if indirect, path toward resolution; it is not "stalling"
+      in the sense the scale's 1-point description means (which is about
+      giving a hollow promise), but it is also not itself progress. For an
+      UNJUSTIFIED decline: score 1-2, matching the "deflects without
+      adding value" description -- the system had what it needed and
+      chose not to use it.
+
+  uncertainty_handling:
+    question: >
+      Does the reply avoid false confidence, and appropriately acknowledge
+      when it can't fully resolve something (e.g. correctly declining to
+      answer, or asking a clarifying question instead of guessing)?
+    scale:
+      5: "Perfectly calibrated -- confident where it should be, clearly (but not excessively) acknowledges limits/insufficient evidence where appropriate."
+      4: "Mostly well-calibrated, minor over- or under-confidence."
+      3: "Somewhat miscalibrated -- either mildly overconfident or overly hedged given what's actually knowable."
+      2: "Notably overconfident (asserts something it shouldn't be sure of), or unnecessarily unhelpful/hedging when a real answer was possible."
+      1: "Either dangerously overconfident or completely unhelpfully evasive."
+    refusal_override: >
+      THIS IS THE PRIMARY DISCRIMINATING DIMENSION for refusals -- it must
+      do the real work V1 asked "helpfulness" and "professionalism" to do
+      by accident. Judge, using the evidence actually shown to you: is
+      this decline JUSTIFIED (score 5), borderline/debatable (score 3), or
+      UNJUSTIFIED because a competent agent could plausibly have answered
+      using only the evidence shown or ordinary product knowledge (score
+      1-2)? A refusal earns no credit here merely for existing.
+
+  professionalism:
+    question: "Is the reply clear, professional, and appropriately concise?"
+    scale:
+      5: "Clear, professional, on-brand, appropriately concise."
+      4: "Professional, minor verbosity or tone issue."
+      3: "Understandable but noticeably clunky, repetitive, or slightly off-tone."
+      2: "Unprofessional, confusing, or significantly too long/short for the content."
+      1: "Unclear, rude, or so poorly formed it would embarrass the brand."
+    refusal_override: >
+      An intentionally empty reply is NOT "unclear, rude, or malformed" --
+      those describe bad TEXT, and there is no text to critique. Score an
+      empty/declined reply as 3 (professionally neutral: an absence of a
+      customer-facing message pending human escalation is not embarrassing,
+      but it is also not a polished interaction on its own -- it earns
+      neither reward nor punishment on this dimension). Do NOT score 5
+      (nothing was actually communicated well) and do NOT score 1 (nothing
+      was communicated badly either -- there is nothing to be rude or
+      malformed).
+
+aggregation:
+  method: "arithmetic_mean"
+  formula: "overall_score = mean(relevance, helpfulness, grounding, factual_safety, resolution_quality, uncertainty_handling, professionalism)"
+  rationale: >
+    Unchanged from V1 -- same equal weighting, same formula. Only the
+    PER-DIMENSION SCORING GUIDANCE for empty/declined replies changed, not
+    the aggregation rule itself, so V1 and V2 scores remain comparable on
+    the same 1-5-per-dimension / mean-of-7 scale.
+
+expected_effect_worked_example:
+  # Included so a reviewer can sanity-check the arithmetic without running
+  # the judge. NOT used by the runner -- documentation only.
+  justified_refusal_v1: "(1, 1, 5, 5, 1, 5, 1) / 7 = 2.71 -- V1's actual score for e.g. golden_0180"
+  justified_refusal_v2: "(5, 3, 5, 5, 3, 5, 3) / 7 = 4.14 -- same case under V2's refusal_override guidance"
+  unjustified_refusal_v1: "(1, 1, 5, 5, 1, 3, 1) / 7 = 2.43 -- V1's actual score for e.g. golden_0173"
+  unjustified_refusal_v2_if_judge_agrees_unjustified: "(1, 1, 5, 5, 1, 2, 3) / 7 = 2.57 -- NOT meaningfully higher than V1, because V2 is designed to keep scoring unjustified refusals harshly"
+  note: >
+    The point of these two worked examples side by side: V2 should move
+    JUSTIFIED refusals up substantially (fixing the identified category
+    error) while leaving UNJUSTIFIED refusals close to where V1 already
+    scored them (professionalism moves 1->3, but relevance/helpfulness/
+    resolution stay low, netting only a small change). If V2 instead
+    raised every refusal's score by a similar large amount regardless of
+    justification, that would indicate V2 is tuning for higher RAG scores
+    rather than correcting a category error -- exactly what Section 4 of
+    the brief prohibits. This is checked empirically, not just asserted,
+    in reports/judge_rubric_audit.md.

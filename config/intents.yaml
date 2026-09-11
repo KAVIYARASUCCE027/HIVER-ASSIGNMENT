@@ -1,0 +1,267 @@
+# AppleSupport intent taxonomy, derived from clustering + manual inspection of
+# `reports/intent_clusters_raw.md` (25 KMeans clusters over 12,000 sampled
+# retrieval_pool root messages). See reports/intent_discovery.md for the full
+# methodology, per-intent frequency, and confusion-risk analysis.
+#
+# `keywords` is NOT part of the required schema -- it exists only so
+# src/analysis/intent_coverage.py can produce a transparent, rule-based
+# coverage estimate over the full retrieval_pool. It is not a trained
+# classifier and must not be treated as one.
+
+intents:
+  - name: ios_update_general_complaint
+    description: >
+      Customer reports that something about their device got worse, broke, or
+      started behaving strangely after an iOS update, without naming a
+      specific symptom that maps to one of the more specific intents below
+      (battery, freezing, keyboard, connectivity, audio, media, app store,
+      photos, account). The largest single bucket in the data (~28% of
+      sampled root messages) -- genuinely the most common shape of first
+      contact, not an invented catch-all.
+    examples:
+      - "This is stupid. The new update for iPhone came out and I can't even install an app"
+      - "my phone keeps getting worse and worse with these updates. WTH?!!! Fix this!"
+      - "Why does your new software have to make my iphone6 obsolete"
+    confusable_intents: [device_freezing_performance, battery_life_drain, vague_frustration_needs_clarification, autocorrect_keyboard_bug]
+    escalation_guidance: >
+      Auto-handle only with a clarifying question (device model + iOS
+      version) -- there is not enough information in the message alone to
+      resolve or even classify further. Escalate if the customer has already
+      provided device/version details and the complaint still doesn't match
+      a known issue, or if frustration language suggests a repeat complaint.
+    keywords: ["update", "ios 11", "ios11", "upgrad", "new software", "latest update"]
+
+  - name: autocorrect_keyboard_bug
+    description: >
+      The iOS 11.1-era autocorrect bug where typing the letter "I" produced a
+      box/question-mark glyph or the letter "A". Extremely high-volume
+      (~16% of sampled root messages across what KMeans initially split into
+      6 near-duplicate clusters) and narrowly time-bound to Oct-Nov 2017.
+      Kept as its own intent specifically because it is a single, well-known,
+      already-fixed issue (Apple shipped 11.1.1/11.1.2) -- an ideal
+      auto-handle case with a canned, confident, non-hallucinated reply.
+    examples:
+      - "why does it auto correct to a box and question mark can you tell me a fix"
+      - "Can y'all seriously fix the issue of not being able to type the letter I"
+      - "every time i type in \"I\" symbols pop out. wtf"
+    confusable_intents: [ios_update_general_complaint]
+    escalation_guidance: >
+      Auto-handle: this is the single clearest auto-handle case in the whole
+      taxonomy (known bug, known fix, no account access or sensitive action
+      required). Escalate only if the customer reports the issue persists
+      after updating to 11.1.1+, since that contradicts the known resolution.
+    keywords: ["question mark", "autocorrect", "auto correct", "letter i", "type the letter", "box with a question", "keyboard glitch"]
+
+  - name: battery_life_drain
+    description: >
+      Battery draining unusually fast, poor battery life, or charging
+      problems, usually attributed to a recent update. Distinct from generic
+      update complaints because the operational response is specific
+      (battery diagnostics steps) rather than an open-ended clarifying
+      question.
+    examples:
+      - "why is my battery draining so fast? Charged to 100%, then about 20 minutes later was on 14%"
+      - "my battery life on my phone has been trash since the new update."
+      - "iOS 11.03 is killing the battery for my iPhone 7."
+    confusable_intents: [ios_update_general_complaint, device_freezing_performance]
+    escalation_guidance: >
+      Auto-handle with standard battery-diagnostic guidance if no account
+      access is needed. Escalate if the customer reports battery
+      swelling/heat/safety concerns, or has already tried standard steps
+      without success.
+    keywords: ["battery life", "battery drain", "draining", "battery died", "charge fast", "battery going", "battery health"]
+
+  - name: device_freezing_performance
+    description: >
+      Device freezing, hanging, becoming unresponsive, or requiring a
+      restart, typically after an update. A specific, actionable symptom with
+      its own standard troubleshooting flow (restart, force-quit, check
+      storage), distinct from an unspecified "it's worse now" complaint.
+    examples:
+      - "over 4k people reporting iOS 11 update is causing freezing...and I am one of them."
+      - "iPhone 7 Plus slows down, hangs & heats upon installing iOS11."
+      - "why does my phone keep restarting and freezing during messages!"
+    confusable_intents: [ios_update_general_complaint, battery_life_drain]
+    escalation_guidance: >
+      Auto-handle with restart/force-quit/storage-check guidance. Escalate if
+      the customer has already tried a restart and a factory-reset-adjacent
+      step (backup/restore) without success, or if data loss is reported.
+    keywords: ["freezing", "freezes", "keeps freezing", "frozen", "unresponsive", "hangs", "hanging", "keeps crashing", "keeps restarting"]
+
+  - name: connectivity_network_messaging_issues
+    description: >
+      WiFi/Bluetooth toggling on by itself, dropped cellular signal, calls
+      not connecting, iMessage/SMS not sending or displaying correctly, or
+      notifications not arriving. Grouped together because they share one
+      operational root cause category (network/radio and messaging-stack
+      behavior) even though the visible symptom varies.
+    examples:
+      - "This IOS 11 is the worst. My wifi turns on magically by ITSELF after I turn it off"
+      - "iPhone 6s Plus have lost the operator network. I cannot make any phone call."
+      - "Messaging does not bring up or recognize contacts, but instead every other chain with contact."
+    confusable_intents: [audio_accessory_issues, ios_update_general_complaint]
+    escalation_guidance: >
+      Auto-handle with standard network-reset guidance (toggle airplane
+      mode, reset network settings) if no carrier-account access is
+      implicated. Escalate if the issue is carrier-specific (may not be
+      Apple's to fix) or persists after standard resets.
+    keywords: ["wifi", "wi-fi", "bluetooth turn", "no signal", "no service", "can't make calls", "imessage", "text message", "notifications not"]
+
+  - name: audio_accessory_issues
+    description: >
+      Problems with EarPods/AirPods, speaker output, headphone jack/adapter,
+      or Bluetooth *audio* pairing/quality specifically (as opposed to
+      general Bluetooth/WiFi connectivity toggling, which falls under
+      connectivity_network_messaging_issues).
+    examples:
+      - "iPhone 6s's speaker has stopped working after updating to latest software update"
+      - "EarPods have broken three times this month"
+      - "my phone won't go off of the headphone setting and I can't hear anything except my alarms"
+    confusable_intents: [connectivity_network_messaging_issues]
+    escalation_guidance: >
+      Auto-handle with standard audio-troubleshooting guidance. Escalate for
+      repeated hardware failure (possible warranty/replacement case) --
+      route toward order_purchase_retail_support handling for the
+      replacement itself.
+    keywords: ["headphone", "earpod", "airpod", "speaker", "no sound", "can't hear", "earphone"]
+
+  - name: media_music_playback_issues
+    description: >
+      Apple Music, iTunes, or Podcasts app problems: playback, library sync,
+      missing songs/albums, subscription access. Distinct from App Store
+      purchase issues (below), which are about acquiring/installing apps
+      rather than consuming media.
+    examples:
+      - "Apple Music isn't working. Already a member but I can't access the songs I've downloaded"
+      - "why did the new update delete about 100 of my songs?"
+      - "my itunes won't stop spontaneously opening and playing various songs"
+    confusable_intents: [app_store_purchase_issues]
+    escalation_guidance: >
+      Auto-handle with app-restart/re-sync guidance. Escalate for billing
+      disputes (charged but content missing) since that needs account/order
+      lookup the public Twitter agent cannot do.
+    keywords: ["apple music", "itunes", "podcast", "playlist", "spotify", "songs", "album"]
+
+  - name: app_store_purchase_issues
+    description: >
+      Problems downloading, updating, or purchasing apps through the App
+      Store, including stalled downloads and in-app-purchase billing that
+      didn't apply correctly.
+    examples:
+      - "I purchased an in app upgrade and it's taken the money but the upgrade hasn't been applied."
+      - "updating xcode via appstore. 7-min remaining 6-hr ago."
+      - "why can't I download iCloud Drive? I have latest software"
+    confusable_intents: [media_music_playback_issues]
+    escalation_guidance: >
+      Auto-handle for stalled-download troubleshooting. Escalate any billing
+      dispute (charged without receiving the purchase) -- requires account
+      lookup.
+    keywords: ["app store", "download app", "in-app purchase", "app won't download", "update app", "appstore"]
+
+  - name: photos_storage_icloud_management
+    description: >
+      Photos app issues, iCloud Photo Library sync, missing/duplicated
+      pictures, or device/iCloud storage management. Distinct from
+      account_apple_id_security, which is about login/access to the account
+      itself rather than the content stored in it.
+    examples:
+      - "how do I get my pictures back they were deleted out of no where?"
+      - "I'm running into a storage issue with my macbook and I want to remove all my music and photos"
+      - "storage almost full message is making me nuts!!!!"
+    confusable_intents: [account_apple_id_security]
+    escalation_guidance: >
+      Auto-handle with standard storage-management / iCloud sync guidance.
+      Escalate if the customer reports photos were deleted unexpectedly
+      (possible account compromise or sync bug needing investigation).
+    keywords: ["photos", "icloud photo", "pictures", "camera roll", "storage almost full", "storage issue", "delete photos"]
+
+  - name: account_apple_id_security
+    description: >
+      Apple ID / iCloud login problems, password resets, suspicious emails
+      or calls claiming to be Apple (phishing verification requests), or
+      account access/closure requests.
+    examples:
+      - "Can't login in [link] the login module doesn't work"
+      - "hi guys, just wondering if this email is genuine please?"
+      - "I keep receiving unsolicited calls from the Apple Store claiming my iCloud has been hacked"
+    confusable_intents: [photos_storage_icloud_management, order_purchase_retail_support]
+    escalation_guidance: >
+      Escalate by default: account access and phishing/security reports are
+      exactly the sensitive-action category this project's escalation policy
+      (Phase H) should never auto-handle, regardless of classifier
+      confidence. Auto-handle only the narrow case of pointing to a public
+      "how to identify a phishing email" article when the customer is simply
+      asking whether something looks legitimate, not requesting account
+      changes.
+    keywords: ["apple id", "icloud account", "password", "login", "sign in", "phishing", "hacked", "suspicious email", "genuine"]
+
+  - name: mac_macos_issues
+    description: >
+      Mac hardware or macOS software problems (as opposed to iOS/iPhone).
+      Kept separate from iPhone-focused intents because the product line,
+      troubleshooting steps, and even the update names (Sierra, High Sierra)
+      are entirely different.
+    examples:
+      - "after updating to High Sierra, finder windows glitch and crash continuously."
+      - "Mac OS10.13.1 SUCKS!!!! Dead machine after sleep twice!!!"
+      - "why is my #MacBookAir opening ALL TextEdit docs as Excel spreadsheets?"
+    confusable_intents: [ios_update_general_complaint]
+    escalation_guidance: >
+      Auto-handle with standard macOS troubleshooting (restart, check for
+      updates, SMC reset for hardware symptoms). Escalate hardware defect
+      reports (e.g. suspected "Staingate"-type known defects) toward
+      order_purchase_retail_support / warranty handling.
+    keywords: ["macbook", "imac", "mac os", "macos", "high sierra", "sierra", " mac "]
+
+  - name: apple_watch_issues
+    description: >
+      Apple Watch hardware, watchOS software, or pairing/connectivity
+      problems specific to the Watch.
+    examples:
+      - "had my Apple Watch just over a week and the band is delaminating already?"
+      - "just bought a apple watch series 3, all working fine except cant connect watch to messenger"
+      - "why does my watch's heart rate monitor always fail when I get a little sweaty?"
+    confusable_intents: []
+    escalation_guidance: >
+      Auto-handle with standard Watch troubleshooting/pairing guidance.
+      Escalate hardware defect reports (band delamination, etc.) toward
+      order_purchase_retail_support / warranty handling.
+    keywords: ["apple watch", "watchos", "watch series"]
+
+  - name: order_purchase_retail_support
+    description: >
+      Order status/delivery problems, in-store purchase issues, warranty or
+      AppleCare coverage questions, physical defects noticed at unboxing, and
+      general dissatisfaction with the retail/support experience itself.
+    examples:
+      - "My iPhone X order is \"In Progress\". What does that mean?"
+      - "unboxed new iPhone X and noticed this scratch on edge of the metal. What should I do?!"
+      - "Was Wondering as Unlocked Iphone X come with worldwide warranty. Will AppleCare + cover in all countries?"
+    confusable_intents: [account_apple_id_security]
+    escalation_guidance: >
+      Escalate by default: order status, replacements, and warranty
+      determinations require account/order lookup the public Twitter agent
+      cannot perform, and involve a real financial/logistics commitment this
+      project's policy should never auto-promise (see decision log on "why
+      we don't auto-handle sensitive actions").
+    keywords: ["order", "delivery", "shipping", "apple store", "warranty", "applecare", "refund", "replace my", "scratch", "defect"]
+
+  - name: vague_frustration_needs_clarification
+    description: >
+      Customer expresses dissatisfaction or directs generic frustration at
+      the brand without naming a specific product, symptom, or actionable
+      request (e.g. "fix this", "what is going on", off-topic venting). A
+      real and common pattern (~6% of sampled root messages) -- distinct
+      from ios_update_general_complaint because there often isn't even
+      enough signal to know an update is involved.
+    examples:
+      - "What da fuck [brand]"
+      - "I just wanna know what's going on here"
+      - "have you all seen this. This came up in safari while looking at [site]"
+    confusable_intents: [ios_update_general_complaint]
+    escalation_guidance: >
+      Cannot be auto-handled or escalated as-is -- there is no actionable
+      content yet. The only correct action is a clarifying question; this
+      intent exists so the evaluation can check that the agent asks rather
+      than guesses or fabricates a resolution.
+    keywords: []  # deliberately empty: this is the residual/fallback bucket, see src/analysis/intent_coverage.py

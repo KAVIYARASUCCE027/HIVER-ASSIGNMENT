@@ -1,0 +1,118 @@
+# Phase I escalation policy configuration. Deterministic, reproducible --
+# every threshold here is justified in reports/escalation_results.md and
+# reports/decision_log.md, not fit against the golden expected_action labels.
+#
+# PROMOTED (Phase I finalization, decision log #20): this is Candidate C
+# from the Phase I.1 experiment (reports/escalation_policy_improvement.md),
+# reviewed and approved. Two changes from the original Phase I policy:
+#   - confidence_threshold: 0.80 -> 0.75 (see intent_uncertainty below)
+#   - three new keyword signal categories added to high_risk_keywords
+# The Phase I.1 experiment artifacts (config/escalation_candidates.yaml,
+# evaluation/results/escalation_candidates.json,
+# reports/escalation_policy_improvement.md) remain unmodified as the
+# historical record of how this promotion was decided.
+#
+# Signals used (all already computed by earlier, frozen phases -- nothing
+# here re-runs classification or RAG):
+#   - Phase G (frozen): per-example self-reported confidence, predicted_intent
+#   - config/intents.yaml (frozen): per-intent escalation_guidance text
+#   - Phase H (frozen): per-example retrieved_evidence / should_answer from
+#     evaluation/results/replies_rag.jsonl
+#
+# Signals considered and REJECTED for lack of data support (see
+# reports/escalation_results.md Step 5 / decision log):
+#   - "alternative_intent is a member of confusable_intents[predicted_intent]"
+#     as an ambiguity flag: measured accuracy for flagged (84.5%, n=116) vs
+#     unflagged (81.0%, n=84) predictions showed NO meaningful gap -- not
+#     predictive, excluded rather than included for appearance's sake.
+#   - top-1 retrieved-evidence intent_match=False among already-sufficient
+#     RAG examples (n=3, all should_answer=True with 0.95-0.98 similarity --
+#     i.e. already confident, correct matches): including this as an
+#     escalate trigger would only add false escalations with no offsetting
+#     safety benefit, so it was not used.
+#   - "multi_intent_complexity": no production-computable signal exists in
+#     this pipeline. The golden set's `sampling_stratum` and `label_notes`
+#     multi-intent markers are evaluation-only artifacts of how the golden
+#     set was *sampled/labeled* -- they would not exist for a real incoming
+#     message, so using them as a policy input would leak evaluation
+#     metadata into a decision meant to run at inference time.
+
+intent_uncertainty:
+  # Confidence buckets from the frozen Phase G confidence_analysis
+  # (evaluation/results/llm_classifier.json): confidence in [0.4, 0.6) had
+  # n=4, accuracy=0.25; confidence in [0.6, 0.8) had n=3, accuracy=0.333.
+  # Pooled: 2/7 correct (28.6%) vs 83.0% overall accuracy -- a small-n but
+  # large, real gap. Threshold originally set from this Phase G accuracy
+  # data, not from the Phase I escalation labels.
+  #
+  # PROMOTED to 0.75 in the Phase I.1/finalization pass: the confidence
+  # sweep (reports/escalation_policy_improvement.md Section 7) showed
+  # 0.60-0.75 are identical on the golden benchmark (fn=15, fp=39) and each
+  # weakly dominates 0.80 (fn=15, fp=40) by one boundary example. 0.75 kept
+  # rather than 0.60 to stay close to the original Phase G accuracy-bucket
+  # justification above.
+  confidence_threshold: 0.75
+  previous_confidence_threshold: 0.80
+  reason: "intent_uncertainty"
+
+high_risk_intents:
+  # The only two intents whose config/intents.yaml `escalation_guidance`
+  # says "Escalate by default" (account access / financial-logistics
+  # commitment the public Twitter agent cannot itself perform).
+  intents: ["account_apple_id_security", "order_purchase_retail_support"]
+  reason: "high_risk_request"
+
+high_risk_keywords:
+  # Directly implements the safety carve-out already written in
+  # config/intents.yaml (battery_life_drain: "Escalate if the customer
+  # reports battery swelling/heat/safety concerns") and
+  # data/golden/LABELING_GUIDE.md ("physical battery safety issues
+  # (swelling, heat, smoke) ... expected_action must be escalate").
+  # Conservative, keyword-gated, same style as src/retrieval/sanitize.py --
+  # not a learned classifier.
+  pattern: '\b(swell|swollen|smoke|smoking|burn|burnt|burning|fire|explod|shock|electrocut|spark|overheat|too hot)\b'
+  reason: "high_risk_request"
+
+# Added in the Phase I.1/finalization promotion (Candidate C). Each directly
+# implements a per-intent conditional escalation clause already written in
+# config/intents.yaml that the original Phase I policy did not encode (a
+# gap flagged in reports/escalation_results.md Section 12). Measured
+# catch-rate and false-positive cost for each in
+# reports/escalation_policy_improvement.md before promotion. A fourth
+# candidate keyword category ("repeat_attempt_language" -- "customer
+# already tried the standard fix") was tested there and explicitly
+# REJECTED: it caught 0/15 false-auto-handle cases (real phrasing was too
+# varied for a keyword regex) while adding false escalates -- not included.
+hardware_damage_keywords:
+  pattern: '\b(broken|busted|defective|cracked|shattered|delaminat|won.t (turn on|charge|power)|stopped working|physically damaged)\b'
+  implements: "audio_accessory_issues / apple_watch_issues / mac_macos_issues / order_purchase_retail_support 'repeated hardware failure' / 'physical defect' escalation clauses"
+  measured_catch: "2/15 original false-auto-handle cases (golden_0081, golden_0189)"
+  measured_cost: "1 net-new false-escalate (golden_0006) -- the riskiest of the three new keyword signals"
+  reason: "high_risk_request"
+
+billing_dispute_keywords:
+  pattern: '\b(charged (me |twice|again)?|duplicate charge|double charged|billing (dispute|issue|problem)|refund|declin(ed|ing)|still charg)\b'
+  implements: "app_store_purchase_issues / media_music_playback_issues 'billing dispute' escalation clauses"
+  measured_catch: "2/15 original false-auto-handle cases (golden_0146, golden_0190)"
+  measured_cost: "0 new false-escalates"
+  reason: "high_risk_request"
+
+data_loss_keywords:
+  pattern: '\b(deleted|erased|disappeared|missing|lost|wiped out)\W+(\w+\W+){0,4}?(photo|contact|file|data|message|note)s?\b'
+  implements: "photos_storage_icloud_management 'unexpectedly deleted' escalation clause"
+  measured_catch: "1/15 original false-auto-handle cases (golden_0149)"
+  measured_cost: "0 new false-escalates"
+  reason: "high_risk_request"
+
+insufficient_historical_evidence:
+  # Phase H's own retrieval-level gate (config/rag.yaml evidence_threshold
+  # = 0.70): retrieved_evidence is empty in replies_rag.jsonl whenever the
+  # top-1 rerank score never cleared that threshold. Reused here, not
+  # redefined -- this is not a new threshold.
+  reason: "insufficient_historical_evidence"
+
+generation_could_not_be_grounded:
+  # Phase H's should_answer=false even though retrieved_evidence was
+  # non-empty: the generator had evidence but judged it didn't actually
+  # answer the question (see reports/rag_results.md Section 11, category 2).
+  reason: "generation_could_not_be_grounded"

@@ -1,0 +1,100 @@
+# Phase J reply-quality rubric. FROZEN before any judge run or human rating
+# — see reports/judge_results.md Section 2 for the freeze statement and
+# reports/decision_log.md for the promotion/change history (if any).
+#
+# 7 dimensions, each scored 1-5. overall_score = arithmetic mean of all 7
+# (equal weight, simple mean — the default the brief suggested; not
+# deviated from, and not changed after seeing any results).
+#
+# The judge is given these exact definitions verbatim (src/evaluation/
+# judge_prompt.py) so scoring is anchored to concrete criteria, not vague
+# "does this look good" reasoning.
+
+dimensions:
+  relevance:
+    question: "Does the reply address the customer's actual stated issue?"
+    scale:
+      5: "Directly and completely addresses the specific issue/question asked."
+      4: "Addresses the core issue with minor gaps (misses a secondary detail)."
+      3: "Addresses the general topic but misses the specific question asked."
+      2: "Only tangentially related; addresses a different aspect of the message."
+      1: "Does not address the customer's issue at all (wrong topic entirely)."
+
+  helpfulness:
+    question: "Does the reply give the customer something actionable?"
+    scale:
+      5: "Concrete, specific next step(s) or a direct resolution the customer can act on immediately."
+      4: "A clear, useful next step, though possibly generic (e.g. a relevant diagnostic question)."
+      3: "Some direction given but vague, or requires the customer to do most of the work."
+      2: "Minimal help; mostly acknowledgment with no clear path forward."
+      1: "No actionable content; pure filler."
+
+  grounding:
+    question: >
+      For RAG replies: are specific claims traceable to the retrieved
+      historical evidence? Paraphrase is fine and should NOT be penalized
+      — do not require lexical copying, and do not reward a reply merely
+      for resembling the historical response word-for-word. For No-RAG
+      replies (no evidence was provided at all): does the reply
+      appropriately stick to general product knowledge / clarifying
+      questions rather than inventing specific unsupported details?
+    scale:
+      5: "Every specific claim (a fix, a policy, an article, a version number) is directly supported by the evidence (RAG), or the reply makes no specific unsupported claims at all (No-RAG)."
+      4: "Grounded/appropriately general, with only a trivial unsupported flourish (e.g. a generic pleasantry)."
+      3: "Mostly grounded/appropriate, but one questionable-yet-plausible unsupported detail."
+      2: "Contains a specific claim not supported by the evidence (RAG), or an invented specific detail (No-RAG), that could mislead the customer."
+      1: "Substantially fabricated, or directly contradicts the provided evidence."
+
+  factual_safety:
+    question: >
+      Distinct from grounding: does the reply avoid objectively false or
+      risky fabrication — invented policies, invented prices, invented
+      deadlines, or claiming an action was taken that wasn't?
+    scale:
+      5: "No fabricated policies, prices, timelines, or claims of action taken."
+      4: "Borderline generic phrasing, very unlikely to mislead, not perfectly precise."
+      3: "One minor unsupported factual assertion, low real-world risk."
+      2: "A specific fabricated policy/price/promise that could mislead the customer."
+      1: "Confidently states false or dangerous information (e.g. claims a refund was processed, invents a safety instruction)."
+
+  resolution_quality:
+    question: "Does the reply appropriately move the customer toward resolution (without over-promising or stalling)?"
+    scale:
+      5: "Clear resolution, or a well-targeted next diagnostic step that meaningfully progresses the case."
+      4: "Reasonable progress, though it may require one more round-trip."
+      3: "Generic 'we'll look into it' — not actively unhelpful, but no real progress."
+      2: "Deflects without adding value beyond what the customer already said."
+      1: "Actively stalls, or promises a resolution path the reply's own content can't actually support."
+
+  uncertainty_handling:
+    question: >
+      Does the reply avoid false confidence, and appropriately acknowledge
+      when it can't fully resolve something (e.g. correctly declining to
+      answer, or asking a clarifying question instead of guessing)?
+    scale:
+      5: "Perfectly calibrated — confident where it should be, clearly (but not excessively) acknowledges limits/insufficient evidence where appropriate."
+      4: "Mostly well-calibrated, minor over- or under-confidence."
+      3: "Somewhat miscalibrated — either mildly overconfident or overly hedged given what's actually knowable."
+      2: "Notably overconfident (asserts something it shouldn't be sure of), or unnecessarily unhelpful/hedging when a real answer was possible."
+      1: "Either dangerously overconfident, or completely unhelpfully evasive."
+
+  professionalism:
+    question: "Is the reply clear, professional, and appropriately concise?"
+    scale:
+      5: "Clear, professional, on-brand, appropriately concise."
+      4: "Professional and clear with minor verbosity or tone issues."
+      3: "Understandable but noticeably clunky, repetitive, or slightly off-tone."
+      2: "Unprofessional, confusing, or significantly too long/short for the content."
+      1: "Unclear, rude, or so poorly formed it would embarrass the brand."
+
+aggregation:
+  method: "arithmetic_mean"
+  formula: "overall_score = mean(relevance, helpfulness, grounding, factual_safety, resolution_quality, uncertainty_handling, professionalism)"
+  rationale: >
+    Equal weighting, no dimension privileged over another. This is the
+    default the brief itself suggested; not changed after seeing any
+    judge or human results. An empty reply (should_answer=false, "" text)
+    is NOT scored as if it were a real reply on relevance/helpfulness/
+    resolution_quality — see src/evaluation/judge_prompt.py for how
+    insufficient-evidence declines are handled (uncertainty_handling
+    carries the weight for "was declining appropriate here").

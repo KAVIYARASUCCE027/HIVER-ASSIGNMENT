@@ -1,0 +1,39 @@
+# Data (never commit raw/processed datasets)
+data/raw/
+data/processed/
+data/interim/
+*.csv
+*.parquet
+!data/golden/*.jsonl
+
+# Vector index / embeddings cache
+data/index/
+*.faiss
+chroma_db/
+.chroma/
+
+# Env / secrets
+.env
+*.key
+kaggle.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs / results (regeneratable via evaluation/run_*.py against frozen
+# cached LLM calls -- see reports/final_report.md Section 11)
+*.log
+evaluation/results/*.json
+evaluation/results/*.jsonl
+!evaluation/results/.gitkeep

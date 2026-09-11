@@ -1,0 +1,59 @@
+# Phase H RAG configuration. No secrets -- LLM credentials stay in .env only.
+
+corpus:
+  source: "data/processed/applesupport_conversations.jsonl (split=retrieval_pool only)"
+  corpus_path: "data/processed/rag_corpus.jsonl"
+  dev_holdout_path: "data/processed/rag_dev_holdout.jsonl"
+  dev_holdout_size: 50
+  dev_holdout_seed: 1234
+  corpus_version: "phase_h_v1"
+  filter: "only conversations with >=1 agent reply; exact-text-overlap-with-golden documents excluded (see reports/decision_log.md)"
+
+embedding:
+  model: "all-MiniLM-L6-v2"  # same sentence-transformers model used in Phase D/E/F
+  embeddings_path: "data/processed/rag_corpus_embeddings.npy"
+  similarity_metric: "cosine (dot product of L2-normalized vectors)"
+
+retrieval:
+  candidates_before_rerank: 30
+  top_k: 5
+  query_uses: "customer message text; predicted intent (Phase G frozen output, never golden truth) used for intent-match scoring only, not concatenated into the embedded query text"
+
+reranking:
+  method: "weighted linear combination"
+  weight_similarity: 0.60
+  weight_intent_match: 0.25
+  weight_resolution_quality: 0.15
+  weights_source: "fixed a priori, documented in src/retrieval/rerank.py; not tuned against golden"
+
+resolution_quality:
+  method: "heuristic (src/retrieval/resolution_quality.py): substantive-content check (0.5) + agent-had-last-word proxy (0.3) + length-scaled (0.2, saturates at 40 words)"
+
+evidence_threshold:
+  min_rerank_score: 0.70
+  source: "Section 7 development evaluation, 50 retrieval_pool dev-holdout queries (never golden)"
+  note: "see reports/retrieval_quality.md and reports/decision_log.md for full reasoning"
+
+pii_sanitization:
+  module: "src/retrieval/sanitize.py"
+  masks: ["email", "phone", "case/order/reference/confirmation/ticket numbers", "card-like digit sequences"]
+
+generation:
+  provider: "gemini"
+  model: "gemini-3.5-flash-lite"  # same model as the frozen Phase G classifier
+  temperature: 0.0
+  max_output_tokens: 400
+  prompt_version: "phase_h_v1"
+  output_schema:
+    reply: "string, customer-facing, empty if should_answer is false"
+    evidence_ids: "list of evidence_id strings actually offered to the model; never invented"
+    should_answer: "boolean"
+    grounding_note: "string, 1 sentence"
+
+ablation:
+  system_a: "no_rag -- same prompt/model/temperature, evidence list always empty"
+  system_b: "rag -- same prompt/model/temperature, evidence = reranked top_k"
+
+leakage:
+  check_script: "src/evaluation/check_rag_leakage.py"
+  status: "see reports/rag_leakage_check.md (must show PASSED before any golden evaluation is run)"

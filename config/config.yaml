@@ -1,0 +1,39 @@
+# Selected brand and core project configuration.
+# See reports/decision_log.md for why this brand was chosen.
+brand:
+  name: "AppleSupport"
+  twitter_handle: "AppleSupport"
+
+data:
+  raw_csv: "data/raw/twcs.csv"
+  processed_dir: "data/processed"
+  golden_path: "data/golden/golden_200.jsonl"
+
+intents:
+  taxonomy_path: "config/intents.yaml"
+  target_count_min: 8
+  target_count_max: 15
+
+# Retrieval (top_k, embedding model, thresholds, reranking) and escalation
+# (signals, thresholds) are each owned entirely by their own phase-specific
+# config file, not duplicated here:
+#   - config/rag.yaml         (Phase H: retrieval.top_k=5, embedding
+#                               model=all-MiniLM-L6-v2, evidence_threshold=0.70)
+#   - config/escalation.yaml  (Phase I/I.1: confidence_threshold=0.75,
+#                               high-risk intents/keywords)
+# This file (config/config.yaml) is descriptive/reference configuration only
+# -- brand, data paths, and the fields below are not currently loaded by any
+# script (each script hard-codes its own paths/constants; see
+# reports/decision_log.md and reports/final_audit_checklist.md). Treat the
+# two files above as the authoritative, load-bearing source for their
+# respective settings.
+
+evaluation:
+  golden_set_size: 200
+  primary_classification_metric: "macro_f1"
+
+# Convention followed independently by each script (TF-IDF/LogReg/KMeans/
+# reconstruct_threads/sample_golden all hard-code 42 directly) rather than
+# actually read from this field. Kept here as documentation of the shared
+# convention, not as a wired-in setting -- see reports/decision_log.md.
+random_seed: 42
